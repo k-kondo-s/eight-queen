@@ -163,7 +163,7 @@ class MinConflictsEngine(Engine):
             (bool): True if it's a solution
         """
         for row_num in range(self.n):
-            # it's not a solution if more thant 2 queens exists on a same row
+            # it's not a solution if more than 2 queens exists on a same row
             if sum(self.current_state[row_num]) != 1:
                 return False
 
@@ -224,7 +224,8 @@ class MinConflictsEngine(Engine):
         """
         # for debug
         self.debug_end_time = datetime.datetime.now()
-        self.debug_duration_seconds = (self.debug_end_time - self.debug_start_time).seconds
+        if self.debug_end_time is not None:
+            self.debug_duration_seconds = (self.debug_end_time - self.debug_start_time).seconds
 
         b = Board(n=self.n)
         for i in range(self.n):
