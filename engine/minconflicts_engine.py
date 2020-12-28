@@ -1,6 +1,5 @@
 from models.model import Engine, Board
 from typing import List, Tuple
-import math
 import random
 import datetime
 
@@ -8,16 +7,18 @@ import datetime
 class MinConflictsEngine(Engine):
     def __init__(self,
                  n: int,
-                 max_steps: int = int(math.pow(10, 7))) -> None:
+                 version: int = 1) -> None:
         """initialize instance
 
         Args:
             n (int): length of chess board
             max_steps (int): the maximum number of attempts within searching
+            version (int): version
         """
         self.n: int = n
-        self.max_steps: int = max_steps
+        self.version: int = version
 
+        self.max_steps: int = self.n * 100
         self.result_boards: List[Board] = []
         self.current_state: List[List[bool]] = [[False for _ in range(self.n)] for _ in range(self.n)]
 
@@ -103,6 +104,12 @@ class MinConflictsEngine(Engine):
         """
         given_row, given_column = unit
 
+        if self.version == 2:
+            # break ties randomly
+            if self.break_ties_randomly():
+                column = random.choice([i for i in range(self.n)])
+                return (given_row, column)
+
         # if no queen exists at the given unit, return itself
         if not self.current_state[given_row][given_column]:
             return (given_row, given_column)
@@ -148,13 +155,29 @@ class MinConflictsEngine(Engine):
     def initialize_current_board(self) -> None:
         """initialize the current board
         """
-        # randomly choose a initial state that does not violate constraints
-        # about rows and columns
-        columns = [i for i in range(self.n)]
-        for row in range(self.n):
-            column = random.choice(columns)
-            self.current_state[row][column] = True
-            columns.remove(column)
+        if self.version == 2:
+            # assign queens minimizing each conflicts counts
+            columns = [i for i in range(self.n)]
+            for row in range(self.n):
+                column = random.choice(columns)
+                self.current_state[row][column] = True
+
+                # search the unit that has the minimum conflicts count to the other
+                next_unit = self.search_next_unit(unit=(row, column))
+
+                # move to the next
+                self.move(previous=(row, column), after=next_unit)
+
+                # remove the chosen column
+                columns.remove(column)
+        else:
+            # randomly choose a initial state that does not violate constraints
+            # about rows and columns
+            columns = [i for i in range(self.n)]
+            for row in range(self.n):
+                column = random.choice(columns)
+                self.current_state[row][column] = True
+                columns.remove(column)
 
     def has_solution(self) -> bool:
         """check if the current board is a solution
@@ -233,3 +256,13 @@ class MinConflictsEngine(Engine):
                 if self.current_state[i][j] is True:
                     b.set_queen(at=(i, j))
         return [b]
+
+    def break_ties_randomly(self, exponent: int = 2) -> bool:
+        """return True or False randomly
+
+        Args:
+            exponent (int): the indicator of uniform distribution
+        """
+        if random.randint(0, 10 ** exponent) == 0:
+            return True
+        return False

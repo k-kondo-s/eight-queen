@@ -161,10 +161,33 @@ def test_solve_minconflicts():
     """
     for i in range(1, 100):
         e = MinConflictsEngine(n=i)
-        boards = e.solve()
+        _ = e.solve()
         print(f'{i}:')
         print(f'  duration: {e.debug_duration_seconds} sec')
-        if i < 40:
-            boards[0].print()
-    # e = MinConflictsEngine(n=2)
-    # e.solve()
+        print(f'  steps: {e.debug_steps}')
+
+
+# @pytest.mark.skip(reason='takes too long time')
+def test_solve_minconflicts_ver_2():
+    """test for solve
+    """
+    for i in range(1, 100):
+        e = MinConflictsEngine(n=i, version=2)
+        _ = e.solve()
+        print(f'{i}:')
+        print(f'  is solution: {e.has_solution()}')
+        print(f'  duration: {e.debug_duration_seconds} sec')
+        print(f'  steps: {e.debug_steps}')
+
+
+def test_million():
+    """test when n = 1,000,000
+    """
+    for j in range(0, 7):
+        i = 10 ** j
+        e = MinConflictsEngine(n=i, version=2)
+        _ = e.solve()
+        print(f'{i}:')
+        print(f'  is solution: {e.has_solution()}')
+        print(f'  duration: {e.debug_duration_seconds} sec')
+        print(f'  steps: {e.debug_steps}')
