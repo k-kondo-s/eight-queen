@@ -16,9 +16,15 @@ class Board():
         self.board: List[List[Union[None, Queen]]] = None
 
         # initialize
-        self.initialize_board()
+        self.reset_board()
 
-    def exists(self, at: Tuple[int, int]) -> bool:
+    def reset_board(self) -> None:
+        """initialize board
+        """
+        # make n-chess board as a 2-dementional list
+        self.board = [[None for _ in range(self.n)] for _ in range(self.n)]
+
+    def has_queen(self, at: Tuple[int, int]) -> bool:
         """get value according to the coodinate
         Args:
             at (Tuple[int, int]): location (row, column)
@@ -30,17 +36,6 @@ class Board():
             return True
         return False
 
-    def get_list(self) -> List[List[Union[Queen, None]]]:
-        """get bare board list
-        """
-        return self.board
-
-    def initialize_board(self) -> None:
-        """initialize board
-        """
-        # make n-chess board as a 2-dementional list
-        self.board = [[None for _ in range(self.n)] for _ in range(self.n)]
-
     def set_queen(self, at: Tuple[int, int]) -> None:
         """Set Queen onto the board
         Args:
@@ -49,12 +44,21 @@ class Board():
         row_at, column_at = at
         self.board[row_at][column_at] = Queen()
 
+    def remove_queen(self, at: Tuple[int, int]) -> None:
+        """Remove Queen from the given place
+        Args:
+            at (Tuple[int, int]): the place where a queen will be removed from (row, column)
+        """
+        row_at, column_at = at
+        self.board[row_at][column_at] = None
+
     def print(self) -> None:
         """Print the current state of the queens on the board
         """
+        # insert a new line anyway
         print()
 
-        # symbol of the Queen
+        # symbol of Queen on the board
         Q = 'Q'
 
         # maximum length of numbers as str
@@ -63,7 +67,7 @@ class Board():
         # seperator
         sep = '-'.join(['-'.center(max_len, '-') for _ in range(self.n + 1)]) + '-'
 
-        # show the top row
+        # print the top row
         top_row_list = [' '.center(max_len, ' ')]
         for i in range(self.n):
             top_row_list.append(str(i).center(max_len, ' '))
@@ -71,7 +75,7 @@ class Board():
         print(top_row)
         print(sep)
 
-        # show the board
+        # print the board state
         for i in range(self.n):
             row_list = [str(i).center(max_len, ' ')]
             for j in self.board[i]:
@@ -86,29 +90,3 @@ class Engine(metaclass=ABCMeta):
     @abstractmethod
     def solve(self, board: Board) -> List[Board]:
         pass
-
-
-class Problem():
-    def __init__(self, board: Board) -> None:
-        """initialize
-        Args:
-            board (Board): Board
-        """
-        self.board: Board = board
-        self.engine: Engine = None
-        self.result_boards: Board = None
-
-    def set_engine(self, engine: Engine) -> None:
-        """set optimization engine
-        """
-        self.engine = engine
-
-    def solve(self) -> None:
-        """solve problem using Engine
-        """
-        self.result_boards = self.engine.solve(board=self.board)
-
-    def get_results(self) -> List[Board]:
-        """get result board
-        """
-        return self.result_boards
