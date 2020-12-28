@@ -27,7 +27,7 @@ def is_collided(at: Tuple[int, int], board: Board) -> bool:
     """
     n = board.n
 
-    # return True constantly if no queen exists at the given place
+    # return False constantly if no queen exists at the given place
     if not board.has_queen(at=at):
         return False
 

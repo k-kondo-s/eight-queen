@@ -88,5 +88,5 @@ class Board():
 
 class Engine(metaclass=ABCMeta):
     @abstractmethod
-    def solve(self, board: Board) -> List[Board]:
+    def solve(self) -> List[Board]:
         pass
