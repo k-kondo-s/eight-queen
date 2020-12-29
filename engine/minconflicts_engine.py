@@ -24,6 +24,9 @@ class MinConflictsEngine(Engine):
 
         self.snapshot_state: List[List[bool]] = None
 
+        # for version 3
+        self.next_unit: Tuple[int, int] = None
+
         # variables for debug
         self.debug_start_time: datetime.datetime = None
         self.debug_end_time: datetime.datetime = None
@@ -76,16 +79,24 @@ class MinConflictsEngine(Engine):
         Returns:
             unit (Tuple[int, int]): a unit where a queen exists and has conflicts to someone
         """
+        # from version 3
+        if self.version >= 3 and self.next_unit is not None:
+            next_unit = self.next_unit
+            self.next_unit = None
+            return next_unit
+
         rows = [i for i in range(self.n)]
         while len(rows) != 0:
             # randomly choose one from rows
             row_num = random.choice(rows)
 
+            # if
+
             # find column where a queen exists
             column_num = self.current_state[row_num].index(True)
 
             # check conflicts at the unit
-            conflicts_count = self.get_conflicts_count(at=(row_num, column_num))
+            conflicts_count, _ = self.get_conflicts_count(at=(row_num, column_num))
 
             # if there is a conflict, return the unit
             if conflicts_count != 0:
@@ -94,17 +105,18 @@ class MinConflictsEngine(Engine):
             # remove row_num from rows
             rows.remove(row_num)
 
-    def search_next_unit(self, unit: Tuple[int, int]) -> Tuple[int, int]:
+    def search_next_unit(self, unit: Tuple[int, int], randomly: bool = True) -> Tuple[int, int]:
         """search a unit that has minimum conflicts count
 
         Args:
             previous (Tuple[int, int]): a unit
+            randomly (bool): enable randomly choice from version 2. Default True
         Returns:
             next_unit (Tuple[int, int]): the next unit where a queen will move
         """
         given_row, given_column = unit
 
-        if self.version == 2:
+        if self.version >= 2 and randomly:
             # break ties randomly
             if self.break_ties_randomly():
                 column = random.choice([i for i in range(self.n)])
@@ -118,7 +130,12 @@ class MinConflictsEngine(Engine):
         self.current_state[given_row][given_column] = False
 
         # generate conflicts count list
-        conflicts_count_list = [self.get_conflicts_count(at=(given_row, column)) for column in range(self.n)]
+        conflicts_count_list = []
+        conflicts_unit_list = []
+        for column in range(self.n):
+            count, conflict_units = self.get_conflicts_count(at=(given_row, column))
+            conflicts_count_list.append(count)
+            conflicts_unit_list.append(conflict_units)
 
         # restore
         self.current_state[given_row][given_column] = True
@@ -126,9 +143,14 @@ class MinConflictsEngine(Engine):
         # get the minumum conflicts count and its unit
         min_conflicts_count = min(conflicts_count_list)
 
-        # return the unit different from the given one
+        # return the unit that is different from the given one
         for column_num in range(self.n):
             if conflicts_count_list[column_num] == min_conflicts_count and column_num != given_column:
+                # for version 3
+                if self.version >= 3:
+                    # randomly choose the next unit and store it into self.next_unit
+                    if len(conflicts_unit_list[column_num]) != 0:
+                        self.next_unit = random.choice(conflicts_unit_list[column_num])
                 return (given_row, column_num)
 
         # return itself otherwise
@@ -155,7 +177,7 @@ class MinConflictsEngine(Engine):
     def initialize_current_board(self) -> None:
         """initialize the current board
         """
-        if self.version == 2:
+        if self.version >= 2:
             # assign queens minimizing each conflicts counts
             columns = [i for i in range(self.n)]
             for row in range(self.n):
@@ -192,34 +214,39 @@ class MinConflictsEngine(Engine):
 
             # it's not a solution if a queen has some conflicts
             column_num = self.current_state[row_num].index(True)
-            conflicts_count = self.get_conflicts_count(at=(row_num, column_num))
+            conflicts_count, _ = self.get_conflicts_count(at=(row_num, column_num))
             if conflicts_count != 0:
                 return False
 
         # otherwise, it's a solution
         return True
 
-    def get_conflicts_count(self, at: Tuple[int, int]) -> int:
+    def get_conflicts_count(self, at: Tuple[int, int]) -> Tuple[int, List[Tuple[int, int]]]:
         """count the conflicts count for the given location
 
         Args:
             at (Tuple[int, int]): unit (row, column)
         Returns:
             count (int): conflicts count
+            conflict_list (Tuple[int, int]): conflict items [(row, column), ...]
         """
         given_row, given_column = at
 
         # define units that should be checked
-        units = None
+        # units = None
+        conflict_count = 0
+        conflict_items_on_different_row = []
 
         # items in the given row should be checked, except for itself
         units = self.current_state[given_row].copy()
         units.pop(given_column)
+        conflict_count += sum(units)
 
         # items in the given column should be checked, except for itself
         for row in range(self.n):
-            if row != given_row:
-                units.append(self.current_state[row][given_column])
+            if row != given_row and self.current_state[row][given_column]:
+                conflict_count += 1
+                conflict_items_on_different_row.append((row, given_column))
 
         # items on the diagonal should be checked, except for itself
         diag_up = given_row + given_column
@@ -228,14 +255,12 @@ class MinConflictsEngine(Engine):
             for column in range(self.n):
                 if row == given_row and column == given_column:
                     continue
-                if row + column == diag_up or row - column == diag_down:
-                    units.append(self.current_state[row][column])
-
-        # sum the conflicts
-        sum_result = sum(units)
+                if (row + column == diag_up or row - column == diag_down) and self.current_state[row][column]:
+                    conflict_count += 1
+                    conflict_items_on_different_row.append((row, column))
 
         # return
-        return sum_result
+        return conflict_count, conflict_items_on_different_row
 
     def convert_to_boards(self) -> List[Board]:
         """convert current state to Board

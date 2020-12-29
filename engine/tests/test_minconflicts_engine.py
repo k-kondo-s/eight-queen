@@ -22,21 +22,21 @@ def test_get_conflicts_count():
     e.current_state = state
 
     # tests
-    assert e.get_conflicts_count(at=(0, 7)) == 3
-    assert e.get_conflicts_count(at=(1, 7)) == 3
-    assert e.get_conflicts_count(at=(2, 7)) == 2
-    assert e.get_conflicts_count(at=(3, 7)) == 3
-    assert e.get_conflicts_count(at=(4, 7)) == 4
-    assert e.get_conflicts_count(at=(5, 7)) == 2
-    assert e.get_conflicts_count(at=(6, 7)) == 3
-    assert e.get_conflicts_count(at=(7, 7)) == 1
+    assert e.get_conflicts_count(at=(0, 7)) == (3, [(7, 7), (2, 5)])
+    assert e.get_conflicts_count(at=(1, 7)) == (3, [(7, 7), (6, 2)])
+    assert e.get_conflicts_count(at=(2, 7)) == (2, [(7, 7)])
+    assert e.get_conflicts_count(at=(3, 7)) == (3, [(7, 7), (0, 4)])
+    assert e.get_conflicts_count(at=(4, 7)) == (4, [(7, 7), (2, 5), (5, 6)])
+    assert e.get_conflicts_count(at=(5, 7)) == (2, [(7, 7)])
+    assert e.get_conflicts_count(at=(6, 7)) == (3, [(7, 7), (5, 6)])
+    assert e.get_conflicts_count(at=(7, 7)) == (1, [(3, 3)])
 
     # remove queen from (7, 7) and (3, 3)
     e.current_state[7][7] = False
     e.current_state[3][3] = False
 
     # tests that (7, 7) has no conflicts
-    assert e.get_conflicts_count(at=(7, 7)) == 0
+    assert e.get_conflicts_count(at=(7, 7)) == (0, [])
 
 
 def test_has_solution():
@@ -112,6 +112,11 @@ def test_choose_one_conflicts():
     # confirm it returns the one in the list
     assert e.choose_one_conflicts() in [(3, 3), (7, 7)]
 
+    # from version 3, return self.next_unit if it has something
+    e3 = MinConflictsEngine(n=3, version=3)
+    e3.next_unit = (6, 2)
+    assert e3.choose_one_conflicts() == (6, 2)
+
 
 def test_search_next_unit():
     """test for search_next_unit
@@ -129,8 +134,14 @@ def test_search_next_unit():
     e = MinConflictsEngine(n=8)
     e.current_state = not_solution
 
-    # confirm that the next unit for (7, 7) is (7, 5)
+    # confirm that the next unit for (7, 7) is (7, 2)
     assert e.search_next_unit(unit=(7, 7)) == (7, 2)
+
+    # if version 3, there must be some unit in next_unit
+    e3 = MinConflictsEngine(n=8, version=3)
+    e3.current_state = not_solution
+    assert e3.search_next_unit(unit=(7, 7), randomly=False) == (7, 2)
+    assert e3.next_unit == (6, 2)
 
 
 def test_move():
@@ -155,39 +166,28 @@ def test_move():
     assert e.current_state[0][2]
 
 
-@pytest.mark.skip(reason='takes too long time')
-def test_solve_minconflicts():
+def test_solve_minconflicts_simple():
     """test for solve
     """
-    for i in range(1, 100):
+    for i in range(1, 9):
         e = MinConflictsEngine(n=i)
-        _ = e.solve()
-        print(f'{i}:')
-        print(f'  duration: {e.debug_duration_seconds} sec')
-        print(f'  steps: {e.debug_steps}')
+        b = e.solve()
+        assert len(b) == 1
 
 
-# @pytest.mark.skip(reason='takes too long time')
-def test_solve_minconflicts_ver_2():
+def test_solve_minconflicts_simple_for_ver2():
     """test for solve
     """
-    for i in range(1, 100):
+    for i in range(1, 9):
         e = MinConflictsEngine(n=i, version=2)
-        _ = e.solve()
-        print(f'{i}:')
-        print(f'  is solution: {e.has_solution()}')
-        print(f'  duration: {e.debug_duration_seconds} sec')
-        print(f'  steps: {e.debug_steps}')
+        b = e.solve()
+        assert len(b) == 1
 
 
-def test_million():
-    """test when n = 1,000,000
+def test_solve_minconflicts_simple_for_ver3():
+    """test for solve
     """
-    for j in range(0, 7):
-        i = 10 ** j
-        e = MinConflictsEngine(n=i, version=2)
-        _ = e.solve()
-        print(f'{i}:')
-        print(f'  is solution: {e.has_solution()}')
-        print(f'  duration: {e.debug_duration_seconds} sec')
-        print(f'  steps: {e.debug_steps}')
+    for i in range(1, 9):
+        e = MinConflictsEngine(n=i, version=3)
+        b = e.solve()
+        assert len(b) == 1
