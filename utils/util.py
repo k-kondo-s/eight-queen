@@ -1,5 +1,10 @@
+import datetime
 from models.model import Board
 from typing import Tuple
+from functools import wraps
+
+# make True if measure how long each function takes time
+ENABLE_STOP_WATCH = False
 
 
 def validate(board: Board) -> bool:
@@ -50,3 +55,19 @@ def is_collided(at: Tuple[int, int], board: Board) -> bool:
             if board.has_queen(at=(i, column)):
                 return True
     return False
+
+
+def stop_watch(func):
+    """stop watch wrapper
+    """
+    @wraps(func)
+    def wrapper(*args, **kargs):
+        if ENABLE_STOP_WATCH:
+            start_time = datetime.datetime.now()
+            result = func(*args, **kargs)
+            duration_milliseconds = (datetime.datetime.now() - start_time) / datetime.timedelta(milliseconds=1)
+            print(f'{func.__name__}: {duration_milliseconds}')
+            return result
+        else:
+            return func(*args, **kargs)
+    return wrapper

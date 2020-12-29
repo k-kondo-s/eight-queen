@@ -1,10 +1,12 @@
 from models.model import Engine, Board
+from utils.util import stop_watch
 from typing import List, Tuple
 import random
 import datetime
 
 
 class MinConflictsEngine(Engine):
+    @stop_watch
     def __init__(self,
                  n: int,
                  version: int = 1) -> None:
@@ -33,6 +35,7 @@ class MinConflictsEngine(Engine):
         self.debug_duration_seconds: int = 0
         self.debug_steps: int = 0
 
+    @stop_watch
     def solve(self) -> List[Board]:
         """solve problem
 
@@ -73,6 +76,7 @@ class MinConflictsEngine(Engine):
         self.debug_steps = self.max_steps
         return self.convert_to_boards()
 
+    @stop_watch
     def choose_one_conflicts(self) -> Tuple[int, int]:
         """randomly choose a unit that conflicts to the other
 
@@ -105,6 +109,7 @@ class MinConflictsEngine(Engine):
             # remove row_num from rows
             rows.remove(row_num)
 
+    @stop_watch
     def search_next_unit(self, unit: Tuple[int, int], randomly: bool = True) -> Tuple[int, int]:
         """search a unit that has minimum conflicts count
 
@@ -156,6 +161,7 @@ class MinConflictsEngine(Engine):
         # return itself otherwise
         return (given_row, given_column)
 
+    @stop_watch
     def move(self, previous: Tuple[int, int], after: Tuple[int, int]) -> None:
         """move a queen to the next unit
 
@@ -174,6 +180,7 @@ class MinConflictsEngine(Engine):
         self.current_state[previous_row][previous_column] = False
         self.current_state[after_row][after_column] = True
 
+    @stop_watch
     def initialize_current_board(self) -> None:
         """initialize the current board
         """
@@ -201,6 +208,7 @@ class MinConflictsEngine(Engine):
                 self.current_state[row][column] = True
                 columns.remove(column)
 
+    @stop_watch
     def has_solution(self) -> bool:
         """check if the current board is a solution
 
@@ -221,6 +229,7 @@ class MinConflictsEngine(Engine):
         # otherwise, it's a solution
         return True
 
+    @stop_watch
     def get_conflicts_count(self, at: Tuple[int, int]) -> Tuple[int, List[Tuple[int, int]]]:
         """count the conflicts count for the given location
 
@@ -249,19 +258,27 @@ class MinConflictsEngine(Engine):
                 conflict_items_on_different_row.append((row, given_column))
 
         # items on the diagonal should be checked, except for itself
+        # the time complexity is now O(n)
         diag_up = given_row + given_column
         diag_down = given_row - given_column
         for row in range(self.n):
-            for column in range(self.n):
-                if row == given_row and column == given_column:
-                    continue
-                if (row + column == diag_up or row - column == diag_down) and self.current_state[row][column]:
-                    conflict_count += 1
-                    conflict_items_on_different_row.append((row, column))
+            if row == given_row:
+                continue
 
+            column_up = diag_up - row
+            if (0 <= column_up < self.n) and self.current_state[row][column_up]:
+                conflict_count += 1
+                conflict_items_on_different_row.append((row, column_up))
+            
+            column_down = row - diag_down
+            if (0 <= column_down < self.n) and self.current_state[row][column_down]:
+                conflict_count += 1
+                conflict_items_on_different_row.append((row, column_down))
+            
         # return
         return conflict_count, conflict_items_on_different_row
 
+    @stop_watch
     def convert_to_boards(self) -> List[Board]:
         """convert current state to Board
 
@@ -282,6 +299,7 @@ class MinConflictsEngine(Engine):
                     b.set_queen(at=(i, j))
         return [b]
 
+    @stop_watch
     def break_ties_randomly(self, exponent: int = 2) -> bool:
         """return True or False randomly
 
