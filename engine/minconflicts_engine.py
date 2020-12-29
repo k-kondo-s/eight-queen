@@ -94,8 +94,6 @@ class MinConflictsEngine(Engine):
             # randomly choose one from rows
             row_num = random.choice(rows)
 
-            # if
-
             # find column where a queen exists
             column_num = self.current_state[row_num].index(True)
 
@@ -186,19 +184,21 @@ class MinConflictsEngine(Engine):
         """
         if self.version >= 2:
             # assign queens minimizing each conflicts counts
-            columns = [i for i in range(self.n)]
+            column = None
             for row in range(self.n):
-                column = random.choice(columns)
+                if column is None:
+                    column = random.choice([i for i in range(self.n)])
+
                 self.current_state[row][column] = True
 
                 # search the unit that has the minimum conflicts count to the other
-                next_unit = self.search_next_unit(unit=(row, column))
+                next_unit = self.search_next_unit(unit=(row, column), randomly=False)
 
                 # move to the next
                 self.move(previous=(row, column), after=next_unit)
 
-                # remove the chosen column
-                columns.remove(column)
+                # set current column (which must have conflicts more than 1)
+                column = next_unit[1]
         else:
             # randomly choose a initial state that does not violate constraints
             # about rows and columns
@@ -289,7 +289,7 @@ class MinConflictsEngine(Engine):
         """
         # for debug
         self.debug_end_time = datetime.datetime.now()
-        if self.debug_end_time is not None:
+        if self.debug_start_time is not None:
             self.debug_duration_seconds = (self.debug_end_time - self.debug_start_time).seconds
 
         b = Board(n=self.n)

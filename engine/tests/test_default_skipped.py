@@ -59,14 +59,23 @@ def test_solve_minconflicts_ver_2():
         print(f'  steps: {e.debug_steps}')
 
 
-@pytest.mark.skip(reason='takes too long time')
+# @pytest.mark.skip(reason='takes too long time')
 def test_solve_minconflicts_ver_3():
     """test for solve
     """
-    for i in range(1, 100):
+    for i in range(200, 210):
         e = MinConflictsEngine(n=i, version=3)
         _ = e.solve()
         print(f'{i}:')
         print(f'  is solution: {e.has_solution()}')
         print(f'  duration: {e.debug_duration_seconds} sec')
         print(f'  steps: {e.debug_steps}')
+
+
+def test_check_conflicts():
+    """i want to look at the conflict count table
+    """
+    e = MinConflictsEngine(n=8, version=3)
+    e.initialize_current_board()
+    b = e.convert_to_boards()
+    b[0].print()
