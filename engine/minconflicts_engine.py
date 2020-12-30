@@ -1,6 +1,6 @@
 from models.model import Engine, Board
 from utils.util import stop_watch
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Set
 import random
 import datetime
 
@@ -20,12 +20,22 @@ class MinConflictsEngine(Engine):
         self.n: int = n
         self.version: int = version
 
+        # constant
+        self.all_list: List[int] = [i for i in range(self.n)]
+
         self.max_steps: int = self.n * 100
         self.result_boards: List[Board] = []
         self.current_state: List[List[bool]] = [[False for _ in range(self.n)] for _ in range(self.n)]
 
         self.snapshot_state: List[List[bool]] = None
         self.random_ratio = max(self.n, 100)
+
+        # variables to manage conflicts count, which makes the time complexity O(n)
+        self.conflicts_table: List[List[int]] = [[0 for _ in range(self.n)] for _ in range(self.n)]
+        # TODO: いらんかも
+        self.conflicts_dict: Dict[int, Dict[int, Set[int]]] = {row: {attaks: set() for attaks in range(0, 7)} for row in range(self.n)}
+        for row in self.conflicts_dict.keys():
+            self.conflicts_dict[row][0] = {column for column in range(self.n)}
 
         # for version 3
         self.unit_on_next_step: Tuple[int, int] = None
@@ -105,57 +115,67 @@ class MinConflictsEngine(Engine):
             randomly (bool): enable randomly choice from version 2. Default True
         Returns:
             next_unit (Tuple[int, int]): the next unit where a queen will move
+        TODO: this function actually needs only row information, while column's one is not needed, so it needs to be modified to fit into it
         """
         given_row, given_column = unit
 
         if self.version >= 2 and randomly:
             # break ties randomly
             if self.break_ties_randomly():
-                column = random.choice([i for i in range(self.n)])
+                column = random.randint(0, self.n - 1)
                 return (given_row, column)
 
-        # if no queen exists at the given unit, return itself
-        if not self.current_state[given_row][given_column]:
-            return (given_row, given_column)
+        if self.version < 5:
+            # if no queen exists at the given unit, return itself
+            # Note: it can be deleted, so it is no longer needed to set True to the (row, column) beforehand
+            if not self.current_state[given_row][given_column]:
+                return (given_row, given_column)
 
         if self.version < 4:
             # remove the queen at the given unit
             self.current_state[given_row][given_column] = False
 
-        # generate conflicts count list
-        conflicts_count_list = []
-        conflicts_unit_list = []
-        for column in range(self.n):
-            count, conflict_units = self.get_conflicts_count(at=(given_row, column))
-            conflicts_count_list.append(count)
-            conflicts_unit_list.append(conflict_units)
-
-        if self.version < 4:
-            # restore
-            self.current_state[given_row][given_column] = True
-
-        # get the minumum conflicts count and its unit
-        min_conflicts_count = min(conflicts_count_list)
-
-        if self.version >= 4:
-            # choose arbitrarily one from the list in which items has conflicts
-            min_column_list = list(filter(lambda i: conflicts_count_list[i] == min_conflicts_count, range(len(conflicts_count_list))))
-            while len(min_column_list) != 0:
-                column = random.choice(min_column_list)
-                if column != given_column:
-                    self.unit_on_next_step = None
+        if self.version >= 5:
+            min_conflict_count_ver5 = min(self.conflicts_table[given_row])
+            random.shuffle(self.all_list)
+            for column in self.all_list:
+                if self.conflicts_table[given_row][column] == min_conflict_count_ver5:
                     return (given_row, column)
-                min_column_list.remove(column)
         else:
-            # return the unit that is different from the given one
-            for column_num in range(self.n):
-                if conflicts_count_list[column_num] == min_conflicts_count and column_num != given_column:
-                    # for version 3
-                    if self.version >= 3:
-                        # randomly choose the next unit and store it into self.next_unit
-                        if len(conflicts_unit_list[column_num]) != 0:
-                            self.unit_on_next_step = random.choice(conflicts_unit_list[column_num])
-                    return (given_row, column_num)
+            # generate conflicts count list
+            conflicts_count_list = []
+            conflicts_unit_list = []
+            for column in range(self.n):
+                count, conflict_units = self.get_conflicts_count(at=(given_row, column))
+                conflicts_count_list.append(count)
+                conflicts_unit_list.append(conflict_units)
+
+            if self.version < 4:
+                # restore
+                self.current_state[given_row][given_column] = True
+
+            # get the minumum conflicts count and its unit
+            min_conflicts_count = min(conflicts_count_list)
+
+            if self.version >= 4:
+                # choose arbitrarily one from the list in which items has conflicts
+                min_column_list = list(filter(lambda i: conflicts_count_list[i] == min_conflicts_count, range(len(conflicts_count_list))))
+                while len(min_column_list) != 0:
+                    column = random.choice(min_column_list)
+                    if column != given_column:
+                        self.unit_on_next_step = None
+                        return (given_row, column)
+                    min_column_list.remove(column)
+            else:
+                # return the unit that is different from the given one
+                for column_num in range(self.n):
+                    if conflicts_count_list[column_num] == min_conflicts_count and column_num != given_column:
+                        # for version 3
+                        if self.version >= 3:
+                            # randomly choose the next unit and store it into self.next_unit
+                            if len(conflicts_unit_list[column_num]) != 0:
+                                self.unit_on_next_step = random.choice(conflicts_unit_list[column_num])
+                        return (given_row, column_num)
 
         # return itself otherwise
         self.unit_on_next_step = None
@@ -177,8 +197,12 @@ class MinConflictsEngine(Engine):
             raise Exception(f'there is no queen at the previous unit {previous}')
 
         # move from the previous to the after
-        self.current_state[previous_row][previous_column] = False
-        self.current_state[after_row][after_column] = True
+        if self.version >= 5:
+            self.remove_queen(at=(previous_row, previous_column))
+            self.put_queen(at=(after_row, after_column))
+        else:
+            self.current_state[previous_row][previous_column] = False
+            self.current_state[after_row][after_column] = True
 
     @stop_watch
     def initialize_current_board(self) -> None:
@@ -193,9 +217,13 @@ class MinConflictsEngine(Engine):
                 column = random.choice(columns)
 
                 # assign initial value using also min-conflicts
-                self.current_state[row][column] = True
-                next_unit = self.search_next_unit(unit=(row, column))
-                self.move(previous=(row, column), after=next_unit)
+                if self.version >= 5:
+                    next_unit = self.search_next_unit(unit=(row, column), randomly=False)
+                    self.put_queen(at=next_unit)
+                else:
+                    self.current_state[row][column] = True
+                    next_unit = self.search_next_unit(unit=(row, column))
+                    self.move(previous=(row, column), after=next_unit)
 
                 # remove assigned column from columns
                 columns.remove(column)
@@ -232,6 +260,7 @@ class MinConflictsEngine(Engine):
 
         Returns:
             (bool): True if it's a solution
+        TODO: make O(n^2) O(n)
         """
         for row_num in range(self.n):
             # it's not a solution if more than 2 queens exists on a same row
@@ -261,6 +290,10 @@ class MinConflictsEngine(Engine):
             for example, if two queens would attack from the same direction, then the conflicts is
             counted once.
         """
+        if self.version >= 5:
+            given_row, given_column = at
+            return self.conflicts_table[given_row][given_column], None
+
         if self.version >= 4:
             given_row, given_column = at
 
@@ -383,3 +416,175 @@ class MinConflictsEngine(Engine):
         if random.randint(0, self.random_ratio) == 0:
             return True
         return False
+
+    @stop_watch
+    def put_queen(self, at: Tuple[int, int]) -> None:
+        """put queen on the board
+
+        also, update conflicts table
+
+        Args:
+            at (Tuple[int, int]): the place where the given queen is putted
+        """
+        given_row, given_column = at
+
+        # put queen
+        self.current_state[given_row][given_column] = True
+
+        # update conflicts table
+        items = self.get_updated_items(at=at)
+        for item in items:
+            row, column = item
+            # TODO
+            # count = self.conflicts_table[row][column]
+
+            # remove column from conflict_dict
+            # TODO:
+            # self.conflicts_dict[row][count].remove(column)
+
+            # update conflicts count
+            new_count = self.conflicts_table[row][column] + 1
+            self.conflicts_table[row][column] = new_count
+
+            # add column to conflict_dict
+            # TODO
+            # self.conflicts_dict[row][new_count].add(column)
+
+    @stop_watch
+    def remove_queen(self, at: Tuple[int, int]) -> None:
+        """remove queen on the board
+
+        also, update conflicts table
+
+        Args:
+            at (Tuple[int, int]): the place where the queen will be removed
+        Note:
+            This function updates conflicts_table
+            This also considers the care in `put_queen` function
+        """
+        given_row, given_column = at
+
+        # remove queen
+        self.current_state[given_row][given_column] = False
+
+        # update conflicts table
+        items = self.get_updated_items(at=at)
+        for item in items:
+            row, column = item
+            # TODO
+            # count = self.conflicts_table[row][column]
+
+            # remove column from conflict_dict
+            # TODO
+            # self.conflicts_dict[row][count].remove(column)
+
+            # update conflicts count
+            new_count = self.conflicts_table[row][column] - 1
+            self.conflicts_table[row][column] = new_count
+
+            # add column to conflict_dict
+            # TODO
+            # self.conflicts_dict[row][new_count].add(column)
+
+    def get_updated_items(self, at: Tuple[int, int]) -> List[Tuple[int, int]]:
+        """get items that have possiblity to be updated on conflicts table
+
+        Args:
+            at (Tuple[int, int]): the place to be putted
+        Returns:
+            columns (List[Tuple[int, int]]): list of columns that might be updated on conflicts table
+        Note:
+            This function updates conflicts_table.
+            There are only 3 situations when putting a new queen on a line (column or diagonals):
+                (1): no queen exists on each side
+                (2): a queen exists on one side
+                (3): two queens exist on each side
+            When we put a new queen, we have to update conflicts table considering the above situations.
+        """
+        given_row, given_column = at
+
+        # update conflicts_table
+        updated_items = []
+
+        # first, check items to be updated on the same column
+        conflicts_rows = []
+        for row in range(given_row - 1, -1, -1):
+            if self.current_state[row][given_column]:
+                conflicts_rows.append(row)
+                break
+        for row in range(given_row + 1, self.n):
+            if self.current_state[row][given_column]:
+                conflicts_rows.append(row)
+                break
+        if len(conflicts_rows) == 2:
+            # the queen is between two queens, so do nothing
+            pass
+        elif len(conflicts_rows) == 1:
+            target_row = conflicts_rows[0]
+            # there is a queen on one side, so update conflict table
+            updated_items += [(r, given_column) for r in range(min(given_row, target_row), max(given_row, target_row) + 1)]
+            updated_items.remove((given_row, given_column))
+        else:
+            # there is no queen before putting a new, so update conflict table
+            updated_items += [(r, given_column) for r in range(0, self.n)]
+            updated_items.remove((given_row, given_column))
+
+        # second, check items to be updated on the diag up
+        conflicts_rows_diag_up = []
+        diag_up = given_row + given_column
+        for row in range(given_row - 1, -1, -1):
+            column = diag_up - row
+            if column < 0 or self.n <= column:
+                break
+            if self.current_state[row][column]:
+                conflicts_rows_diag_up.append(row)
+                break
+        for row in range(given_row + 1, self.n):
+            column = diag_up - row
+            if column < 0 or self.n <= column:
+                break
+            if self.current_state[row][column]:
+                conflicts_rows_diag_up.append(row)
+                break
+        if len(conflicts_rows_diag_up) == 2:
+            pass
+        elif len(conflicts_rows_diag_up) == 1:
+            target_row = conflicts_rows_diag_up[0]
+            updated_items += [(r, diag_up - r) for r in range(min(given_row, target_row), max(given_row, target_row) + 1)]
+            updated_items.remove((given_row, given_column))
+        else:
+            start_row = max(0, diag_up - self.n + 1)
+            end_row = min(diag_up, self.n - 1)
+            updated_items += [(r, diag_up - r) for r in range(start_row, end_row + 1)]
+            updated_items.remove((given_row, given_column))
+
+        # last, check items to be updated on the diag down
+        conflicts_rows_diag_down = []
+        diag_down = given_row - given_column
+        for row in range(given_row - 1, -1, -1):
+            column = row - diag_down
+            if column < 0 or self.n <= column:
+                break
+            if self.current_state[row][column]:
+                conflicts_rows_diag_down.append(row)
+                break
+        for row in range(given_row + 1, self.n):
+            column = row - diag_down
+            if column < 0 or self.n <= column:
+                break
+            if self.current_state[row][column]:
+                conflicts_rows_diag_down.append(row)
+                break
+        if len(conflicts_rows_diag_down) == 2:
+            pass
+        elif len(conflicts_rows_diag_down) == 1:
+            target_row = conflicts_rows_diag_down[0]
+            updated_items += [(r, r - diag_down) for r in range(min(given_row, target_row), max(given_row, target_row) + 1)]
+            updated_items.remove((given_row, given_column))
+        else:
+            start_row = max(diag_down, 0)
+            end_row = min(diag_down + self.n, self.n)
+            updated_items += [(r, r - diag_down) for r in range(start_row, end_row)]
+            updated_items.remove((given_row, given_column))
+
+        return updated_items

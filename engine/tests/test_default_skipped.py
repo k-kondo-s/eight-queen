@@ -83,3 +83,17 @@ def test_solve_minconflicts_ver_4():
         print(f'  is solution: {e.has_solution()}')
         print(f'  duration: {e.debug_duration_seconds} sec')
         print(f'  steps: {e.debug_steps}')
+
+
+@pytest.mark.skip(reason='takes too long time')
+def test_solve_minconflicts_ver_5():
+    """test for solve
+    """
+    for i in range(10000, 10001):
+        e = MinConflictsEngine(n=i, version=5)
+        bs = e.solve()
+        print(f'{i}:')
+        print(f'  is solution: {e.has_solution()}')
+        print(f'  duration: {e.debug_duration_seconds} sec')
+        print(f'  steps: {e.debug_steps}')
+        # bs[0].print()

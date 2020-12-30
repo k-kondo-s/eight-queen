@@ -1,5 +1,6 @@
 from engine.minconflicts_engine import MinConflictsEngine
 import pytest
+import random
 
 
 def test_get_conflicts_count():
@@ -219,5 +220,86 @@ def test_solve_minconflicts_simple_for_ver3():
     """
     for i in range(1, 9):
         e = MinConflictsEngine(n=i, version=3)
+        b = e.solve()
+        assert len(b) == 1
+
+
+def test_get_updated_items():
+    """test for put_queen
+    """
+    e = MinConflictsEngine(n=3)
+    assert set(e.get_updated_items(at=(0, 0))) == {(1, 0), (2, 0), (1, 1), (2, 2)}
+    assert set(e.get_updated_items(at=(0, 1))) == {(1, 1), (2, 1), (1, 0), (1, 2)}
+    assert set(e.get_updated_items(at=(0, 2))) == {(1, 2), (2, 2), (1, 1), (2, 0)}
+    assert set(e.get_updated_items(at=(1, 0))) == {(0, 0), (2, 0), (0, 1), (2, 1)}
+    assert set(e.get_updated_items(at=(1, 1))) == {(0, 1), (2, 1), (0, 0), (2, 2), (0, 2), (2, 0)}
+    assert set(e.get_updated_items(at=(1, 2))) == {(0, 2), (2, 2), (0, 1), (2, 1)}
+    assert set(e.get_updated_items(at=(2, 0))) == {(0, 0), (1, 0), (1, 1), (0, 2)}
+    assert set(e.get_updated_items(at=(2, 1))) == {(0, 1), (1, 1), (1, 0), (1, 2)}
+    assert set(e.get_updated_items(at=(2, 2))) == {(0, 2), (1, 2), (0, 0), (1, 1)}
+
+
+def test_put_and_remove_queen():
+    """test for put_queen and remove_queen
+    """
+    e = MinConflictsEngine(n=3)
+
+    e.put_queen(at=(1, 1))
+    assert e.conflicts_table == [[1, 1, 1], [0, 0, 0], [1, 1, 1]]
+    e.put_queen(at=(0, 1))
+    assert e.conflicts_table == [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
+    e.put_queen(at=(2, 1))
+    assert e.conflicts_table == [[1, 1, 1], [2, 2, 2], [1, 1, 1]]
+    e.remove_queen(at=(2, 1))
+    assert e.conflicts_table == [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
+    e.put_queen(at=(2, 0))
+    assert e.conflicts_table == [[2, 1, 1], [2, 2, 1], [1, 1, 1]]
+    e.remove_queen(at=(2, 0))
+    assert e.conflicts_table == [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
+    e.put_queen(at=(2, 2))
+    assert e.conflicts_table == [[1, 1, 2], [1, 2, 2], [1, 1, 1]]
+    e.remove_queen(at=(0, 1))
+    assert e.conflicts_table == [[1, 1, 2], [0, 1, 1], [1, 1, 1]]
+    e.put_queen(at=(0, 0))
+    assert e.conflicts_table == [[1, 1, 2], [1, 2, 1], [2, 1, 1]]
+    e.remove_queen(at=(0, 0))
+    assert e.conflicts_table == [[1, 1, 2], [0, 1, 1], [1, 1, 1]]
+    e.put_queen(at=(0, 2))
+    assert e.conflicts_table == [[1, 1, 2], [0, 2, 2], [1, 1, 2]]
+
+    # test for conflicts dict is valid
+    # TODO: delete
+    # assert e.conflicts_dict == {0: {0: set(), 1: {1, 0}, 2: {2}, 3: set(), 4: set(), 5: set(), 6: set()},
+    #                             1: {0: {0}, 1: set(), 2: {2, 1}, 3: set(), 4: set(), 5: set(), 6: set()},
+    #                             2: {0: set(), 1: {1, 0}, 2: {2}, 3: set(), 4: set(), 5: set(), 6: set()}}
+
+    # try put and remove queens for 100 times and confirm the last state is all zeros
+    for _ in range(100):
+        e = MinConflictsEngine(n=8)
+        columns = [random.randint(0, 7) for _ in range(8)]
+        items = list(zip([i for i in range(8)], columns))
+        for item in items:
+            e.put_queen(at=item)
+        while len(items) != 0:
+            item = random.choice(items)
+            e.remove_queen(at=item)
+            items.remove(item)
+        assert e.conflicts_table == [[0 for _ in range(8)] for _ in range(8)]
+
+
+def test_solve_minconflicts_simple_for_ver4():
+    """test for solve
+    """
+    for i in range(1, 9):
+        e = MinConflictsEngine(n=i, version=4)
+        b = e.solve()
+        assert len(b) == 1
+
+
+def test_solve_minconflicts_simple_for_ver5():
+    """test for solve
+    """
+    for i in range(1, 9):
+        e = MinConflictsEngine(n=i, version=5)
         b = e.solve()
         assert len(b) == 1
