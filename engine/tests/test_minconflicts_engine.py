@@ -38,6 +38,41 @@ def test_get_conflicts_count():
     # tests that (7, 7) has no conflicts
     assert e.get_conflicts_count(at=(7, 7)) == (0, [])
 
+    # for version 4
+    # version 4 engine does not count queens on the same row
+    # define current state
+    state = [
+        [False, False, False, False, True, False, False, False],
+        [True, False, False, False, False, False, False, False],
+        [False, False, False, False, False, True, False, False],
+        [False, False, False, True, False, False, False, False],
+        [False, True, False, False, False, False, False, False],
+        [False, False, False, False, False, False, True, False],
+        [False, False, True, False, False, False, False, False],
+        [False, False, False, False, False, False, False, True]
+    ]
+
+    # initialize instance
+    e = MinConflictsEngine(n=8, version=4)
+    e.current_state = state
+
+    # tests
+    assert e.get_conflicts_count(at=(0, 7)) == (2, [(7, 7), (2, 5)])
+    assert e.get_conflicts_count(at=(1, 7)) == (2, [(7, 7), (6, 2)])
+    assert e.get_conflicts_count(at=(2, 7)) == (1, [(7, 7)])
+    assert e.get_conflicts_count(at=(3, 7)) == (2, [(7, 7), (0, 4)])
+    assert e.get_conflicts_count(at=(4, 7)) == (3, [(7, 7), (5, 6), (2, 5)])
+    assert e.get_conflicts_count(at=(5, 7)) == (1, [(7, 7)])
+    assert e.get_conflicts_count(at=(6, 7)) == (2, [(7, 7), (5, 6)])
+    assert e.get_conflicts_count(at=(7, 7)) == (1, [(3, 3)])
+
+    # remove queen from (7, 7) and (3, 3)
+    e.current_state[7][7] = False
+    e.current_state[3][3] = False
+
+    # tests that (7, 7) has no conflicts
+    assert e.get_conflicts_count(at=(7, 7)) == (0, [])
+
 
 def test_has_solution():
     """test for has_solution
@@ -112,11 +147,6 @@ def test_choose_one_conflicts():
     # confirm it returns the one in the list
     assert e.choose_one_conflicts() in [(3, 3), (7, 7)]
 
-    # from version 3, return self.next_unit if it has something
-    e3 = MinConflictsEngine(n=3, version=3)
-    e3.next_unit = (6, 2)
-    assert e3.choose_one_conflicts() == (6, 2)
-
 
 def test_search_next_unit():
     """test for search_next_unit
@@ -141,7 +171,7 @@ def test_search_next_unit():
     e3 = MinConflictsEngine(n=8, version=3)
     e3.current_state = not_solution
     assert e3.search_next_unit(unit=(7, 7), randomly=False) == (7, 2)
-    assert e3.next_unit == (6, 2)
+    assert e3.unit_on_next_step == (6, 2)
 
 
 def test_move():
