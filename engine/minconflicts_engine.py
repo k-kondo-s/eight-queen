@@ -6,6 +6,10 @@ import datetime
 
 
 class MinConflictsEngine(Engine):
+    COLUMN = 'column'
+    DIAG_UP = 'diag_up'
+    DIAG_DOWN = 'diag_down'
+
     @stop_watch
     def __init__(self,
                  n: int,
@@ -36,6 +40,15 @@ class MinConflictsEngine(Engine):
         self.conflicts_dict: Dict[int, Dict[int, Set[int]]] = {row: {attaks: set() for attaks in range(0, 7)} for row in range(self.n)}
         for row in self.conflicts_dict.keys():
             self.conflicts_dict[row][0] = {column for column in range(self.n)}
+        
+        # from version 6
+        self.conflicts_num_dict: Dict[str, Dict[int, int]] = {MinConflictsEngine.COLUMN: {}, MinConflictsEngine.DIAG_UP: {}, MinConflictsEngine.DIAG_DOWN: {}}
+        for column in range(self.n):
+            self.conflicts_num_dict[MinConflictsEngine.COLUMN][column] = 0
+        for diag_up in range(2 * self.n - 2 + 1):
+            self.conflicts_num_dict[MinConflictsEngine.DIAG_UP][diag_up] = 0
+        for diag_down in range(- (self.n - 1), self.n - 1 + 1):
+            self.conflicts_num_dict[MinConflictsEngine.DIAG_DOWN][diag_down] = 0
 
         # for version 3
         self.unit_on_next_step: Tuple[int, int] = None
@@ -135,12 +148,31 @@ class MinConflictsEngine(Engine):
             # remove the queen at the given unit
             self.current_state[given_row][given_column] = False
 
-        if self.version >= 5:
+        if self.version >= 6:
+            min_count = self.n
+            count_list = []
+            for column in range(self.n):
+                current_count = self.conflicts_num_dict[MinConflictsEngine.COLUMN][column]
+                current_count += self.conflicts_num_dict[MinConflictsEngine.DIAG_UP][given_row + column]
+                current_count += self.conflicts_num_dict[MinConflictsEngine.DIAG_DOWN][given_row - column]
+                if current_count < min_count:
+                    count_list.append((column, current_count))
+                    min_count = current_count
+            random.shuffle(count_list)
+            for column, c in count_list:
+                if c == min_count:
+                    return (given_row, column)
+            
+        elif self.version >= 5:
             min_conflict_count_ver5 = min(self.conflicts_table[given_row])
             random.shuffle(self.all_list)
             for column in self.all_list:
                 if self.conflicts_table[given_row][column] == min_conflict_count_ver5:
                     return (given_row, column)
+            # for i in range(self.n):
+            #     column = (given_column + i) % self.n
+            #     if self.conflicts_table[given_row][column] == min_conflict_count_ver5:
+            #         return (given_row, column)
         else:
             # generate conflicts count list
             conflicts_count_list = []
@@ -205,10 +237,31 @@ class MinConflictsEngine(Engine):
             self.current_state[after_row][after_column] = True
 
     @stop_watch
-    def initialize_current_board(self) -> None:
+    def initialize_current_board(self, debug_row=None) -> None:
         """initialize the current board
         """
-        if self.version >= 4:
+        if self.version >= 6:
+            for row in range(self.n):
+                if debug_row is not None and debug_row == row:
+                    return None
+                
+                # debug
+                column = 0
+                if row != 0:
+                    column = self.current_state[row - 1].index(True)
+                next_unit = self.search_next_unit(unit=(row, column), randomly=False)
+                self.put_queen(at=next_unit)
+
+
+
+                # column = row * 2
+                # if column >= self.n:
+                #     column = 2 * (row - (((self.n + 1) // 2))) + 3
+                # if row == self.n - 1:
+                #     column = 1
+                # self.put_queen(at=(row, column))
+
+        elif self.version >= 4:
             # list of assignable column (= Domain of row)
             columns = [i for i in range(self.n)]
             for row in range(self.n):
@@ -262,16 +315,26 @@ class MinConflictsEngine(Engine):
             (bool): True if it's a solution
         TODO: make O(n^2) O(n)
         """
-        for row_num in range(self.n):
-            # it's not a solution if more than 2 queens exists on a same row
-            if sum(self.current_state[row_num]) != 1:
-                return False
+        if self.version >= 6:
+            for row in range(self.n):
+                column = self.current_state[row].index(True)
+                if self.conflicts_num_dict[MinConflictsEngine.COLUMN][column] != 1:
+                    return False
+                if self.conflicts_num_dict[MinConflictsEngine.DIAG_UP][row + column] != 1:
+                    return False
+                if self.conflicts_num_dict[MinConflictsEngine.DIAG_DOWN][row - column] != 1:
+                    return False
+        else:
+            for row_num in range(self.n):
+                # it's not a solution if more than 2 queens exists on a same row
+                if sum(self.current_state[row_num]) != 1:
+                    return False
 
-            # it's not a solution if a queen has some conflicts
-            column_num = self.current_state[row_num].index(True)
-            conflicts_count, _ = self.get_conflicts_count(at=(row_num, column_num))
-            if conflicts_count != 0:
-                return False
+                # it's not a solution if a queen has some conflicts
+                column_num = self.current_state[row_num].index(True)
+                conflicts_count, _ = self.get_conflicts_count(at=(row_num, column_num))
+                if conflicts_count != 0:
+                    return False
 
         # otherwise, it's a solution
         return True
@@ -290,6 +353,13 @@ class MinConflictsEngine(Engine):
             for example, if two queens would attack from the same direction, then the conflicts is
             counted once.
         """
+        if self.version >= 6:
+            given_row, given_column = at
+            current_count = self.conflicts_num_dict[MinConflictsEngine.COLUMN][given_column]
+            current_count += self.conflicts_num_dict[MinConflictsEngine.DIAG_UP][given_row + given_column]
+            current_count += self.conflicts_num_dict[MinConflictsEngine.DIAG_DOWN][given_row - given_column]
+            return current_count, None
+
         if self.version >= 5:
             given_row, given_column = at
             return self.conflicts_table[given_row][given_column], None
@@ -431,24 +501,29 @@ class MinConflictsEngine(Engine):
         # put queen
         self.current_state[given_row][given_column] = True
 
-        # update conflicts table
-        items = self.get_updated_items(at=at)
-        for item in items:
-            row, column = item
-            # TODO
-            # count = self.conflicts_table[row][column]
+        if self.version >= 6:
+            self.conflicts_num_dict[MinConflictsEngine.COLUMN][given_column] += 1
+            self.conflicts_num_dict[MinConflictsEngine.DIAG_UP][given_row + given_column] += 1
+            self.conflicts_num_dict[MinConflictsEngine.DIAG_DOWN][given_row - given_column] += 1
+        else:
+            # update conflicts table
+            items = self.get_updated_items(at=at)
+            for item in items:
+                row, column = item
+                # TODO
+                # count = self.conflicts_table[row][column]
 
-            # remove column from conflict_dict
-            # TODO:
-            # self.conflicts_dict[row][count].remove(column)
+                # remove column from conflict_dict
+                # TODO:
+                # self.conflicts_dict[row][count].remove(column)
 
-            # update conflicts count
-            new_count = self.conflicts_table[row][column] + 1
-            self.conflicts_table[row][column] = new_count
+                # update conflicts count
+                new_count = self.conflicts_table[row][column] + 1
+                self.conflicts_table[row][column] = new_count
 
-            # add column to conflict_dict
-            # TODO
-            # self.conflicts_dict[row][new_count].add(column)
+                # add column to conflict_dict
+                # TODO
+                # self.conflicts_dict[row][new_count].add(column)
 
     @stop_watch
     def remove_queen(self, at: Tuple[int, int]) -> None:
@@ -467,24 +542,29 @@ class MinConflictsEngine(Engine):
         # remove queen
         self.current_state[given_row][given_column] = False
 
-        # update conflicts table
-        items = self.get_updated_items(at=at)
-        for item in items:
-            row, column = item
-            # TODO
-            # count = self.conflicts_table[row][column]
+        if self.version >= 6:
+            self.conflicts_num_dict[MinConflictsEngine.COLUMN][given_column] -= 1
+            self.conflicts_num_dict[MinConflictsEngine.DIAG_UP][given_row + given_column] -= 1
+            self.conflicts_num_dict[MinConflictsEngine.DIAG_DOWN][given_row - given_column] -= 1
+        else:
+            # update conflicts table
+            items = self.get_updated_items(at=at)
+            for item in items:
+                row, column = item
+                # TODO
+                # count = self.conflicts_table[row][column]
 
-            # remove column from conflict_dict
-            # TODO
-            # self.conflicts_dict[row][count].remove(column)
+                # remove column from conflict_dict
+                # TODO
+                # self.conflicts_dict[row][count].remove(column)
 
-            # update conflicts count
-            new_count = self.conflicts_table[row][column] - 1
-            self.conflicts_table[row][column] = new_count
+                # update conflicts count
+                new_count = self.conflicts_table[row][column] - 1
+                self.conflicts_table[row][column] = new_count
 
-            # add column to conflict_dict
-            # TODO
-            # self.conflicts_dict[row][new_count].add(column)
+                # add column to conflict_dict
+                # TODO
+                # self.conflicts_dict[row][new_count].add(column)
 
     def get_updated_items(self, at: Tuple[int, int]) -> List[Tuple[int, int]]:
         """get items that have possiblity to be updated on conflicts table
@@ -588,3 +668,33 @@ class MinConflictsEngine(Engine):
             updated_items.remove((given_row, given_column))
 
         return updated_items
+
+    def print_conflicts_table(self):
+        """Print conflicts table
+        """
+        # insert a new line anyway
+        print()
+
+        # maximum length of numbers as str
+        max_len = len(str(self.n))
+
+        # seperator
+        sep = '-'.join(['-'.center(max_len, '-') for _ in range(self.n + 1)]) + '-'
+
+        # print the top row
+        top_row_list = [' '.center(max_len, ' ')]
+        for i in range(self.n):
+            top_row_list.append(str(i).center(max_len, ' '))
+        top_row = '|'.join(top_row_list) + '|'
+        print(top_row)
+        print(sep)
+
+        # print the board state
+        for i in range(self.n):
+            row_list = [str(i).center(max_len, ' ')]
+            for j in range(self.n):
+                s = str(self.conflicts_table[i][j]).center(max_len, ' ')
+                row_list.append(s)
+            row = '|'.join(row_list) + '|'
+            print(row)
+            print(sep)
