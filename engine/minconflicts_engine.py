@@ -240,7 +240,12 @@ class MinConflictsEngine(Engine):
     def initialize_current_board(self, debug_row=None) -> None:
         """initialize the current board
         """
-        if self.version >= 6:
+        if self.version >= 60:
+            columns = [i for i in range(self.n)]
+            random.shuffle(columns)
+            for row in range(self.n):
+                self.put_queen(at=(row, columns[row]))
+        elif self.version >= 50:
             for row in range(self.n):
                 if debug_row is not None and debug_row == row:
                     return None
