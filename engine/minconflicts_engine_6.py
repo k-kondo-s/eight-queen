@@ -1,5 +1,5 @@
 from models.model import Engine, Board
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple
 import random
 import time
 from collections import deque
